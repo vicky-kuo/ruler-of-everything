@@ -173,7 +173,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# ruler stuff:
 /ruler/runs
 /ruler/dataset
 /ruler/output_pictures
 /ruler/yolo11n-seg.pt
+
+# Gen6D stuff:
+/Gen6D/data

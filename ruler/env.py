@@ -1,8 +1,6 @@
 import os
-import math
 
 task = "segment"
-
 
 datasetPath = os.path.join("dataset")
 generateDatasetPath = os.path.join("generate_dataset")

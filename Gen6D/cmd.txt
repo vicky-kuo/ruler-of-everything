@@ -1,0 +1,16 @@
+py -3.11 -m prepare --action video2image `
+                  --input data/custom/video/minion-ref.mp4 `
+                  --output data/custom/minion/images `
+                  --frame_inter 10 `
+                  --image_size 960 `
+                  --transpose
+
+py -3.11 -m prepare --action sfm --database_name custom/minion --colmap "C:\Program Files\colmap\bin\colmap.exe"
+
+py -3.11 -m predict --cfg configs/gen6d_pretrain.yaml `
+                  --database custom/minion `
+                  --video data/custom/video/minion-test.mp4 `
+                  --resolution 960 `
+                  --transpose `
+                  --output data/custom/minion/test `
+                  --ffmpeg "C:\Program Files\ffmpeg\bin\ffmpeg.exe"
