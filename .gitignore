@@ -172,3 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+/ruler/runs
+/ruler/dataset
+/ruler/output_pictures
+/ruler/yolo11n-seg.pt
