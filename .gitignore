@@ -180,4 +180,4 @@ cython_debug/
 /ruler/yolo11n-seg.pt
 
 # Gen6D stuff:
-/Gen6D/data
+/data

@@ -2,20 +2,21 @@ import os
 
 task = "segment"
 
-datasetPath = os.path.join("dataset")
-generateDatasetPath = os.path.join("generate_dataset")
-dataPath = os.path.join(datasetPath, "data.yaml")
+dataset_path = os.path.join("dataset")
+generate_dataset_path = os.path.join("generate_dataset")
+data_path = os.path.join(dataset_path, "data.yaml")
 
-inputPath = os.path.join("input_pictures")
-outputPath = os.path.join("output_pictures")
+input_path = os.path.join("input_pictures")
+output_path = os.path.join("output_pictures")
 
 # YOLO
-yoloModelVersion = "train"
-modelFolder = os.path.join("runs", task, yoloModelVersion)
-modelPath = os.path.join(modelFolder, "weights", "best.pt")
+yolo_model_version = "train"
+taskFolder = os.path.join("runs", task)
+model_folder = os.path.join("runs", task, yolo_model_version)
+model_path = os.path.join(model_folder, "weights", "best.pt")
 
 # Roboflow
-apiKey = "AuWUC9FXJwD3HYlOXO2l"
+api_key = "AuWUC9FXJwD3HYlOXO2l"
 workspace = "size-estimation"
-projectName = "ruler-of-everything"
-roboflowModelVersion = 1
+project_name = "ruler-of-everything"
+roboflow_model_version = 1

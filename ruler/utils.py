@@ -1,9 +1,9 @@
 import os
 import cv2
 
-def getAbsolutePath(path: str):
-    absolutePath = os.path.dirname(__file__)
-    return os.path.join(absolutePath, path)
+def get_absolute_path(path: str):
+    absolute_path = os.path.dirname(__file__)
+    return os.path.join(absolute_path, path)
 
 def find_center(mask):
     m = cv2.moments(mask)
