@@ -2,13 +2,14 @@ from ultralytics import YOLO
 import numpy as np
 import os
 import cv2
-from .utils import get_absolute_path, find_center
-import ruler.env as env
+from utils.other_utils import find_center
+import env
 
 
 def predict(args, input_file: str):
-    model = YOLO(get_absolute_path(env.model_path))
+    model = YOLO(env.ruler_model_path)
     results = model(input_file, verbose=False)
+    name = os.path.basename(input_file).split(".")[0]
 
     best_ruler_center = (0, 0)
     best_ruler_width = 0
@@ -35,9 +36,8 @@ def predict(args, input_file: str):
         if highest_confidence == -1.0:
             print("WARN! no ruler found in picture: " + result.path)
 
-        output_file_path = get_absolute_path(
-            os.path.join(args.output, f"{args.name}-ruler.jpg")
-        )
+        output_file_path = os.path.join(args.output, f"{name}-ruler.jpg")
+
         print(f"Saving ruler annotation output to: {output_file_path}")
         print("Center:", best_ruler_center)
         print("Width:", best_ruler_width)
@@ -51,11 +51,11 @@ def _test():
     args = type("ObjectArgs", (object,), {})()
     args.output_path = env.output_path
 
-    filenames = [file for file in os.listdir(get_absolute_path(env.input_path))]
+    filenames = [file for file in os.listdir(env.input_path)]
 
     for filename in filenames:
         args.name = filename.split(".")[0]
-        _, _ = predict(args, get_absolute_path(os.path.join(env.input_path, filename)))
+        _, _ = predict(args, os.path.join(env.input_path, filename))
 
 
 # test the predict function

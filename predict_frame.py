@@ -1,8 +1,8 @@
 from pathlib import Path
-import argparse
+import os
 import numpy as np
 import cv2
-import sys
+import warnings
 from skimage.io import imsave, imread
 
 from dataset.database import parse_database_name, get_ref_point_cloud
@@ -10,6 +10,9 @@ from estimator import name2estimator
 from utils.base_utils import load_cfg, project_points
 from utils.draw_utils import pts_range_to_bbox_pts, draw_bbox_3d
 from utils.pose_utils import pnp
+from utils.other_utils import caculate_distance
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def weighted_pts(pts_list, weight_num=10, std_inv=10):
@@ -28,7 +31,8 @@ def cacluate_center(pts2d):
     return center
 
 
-def predict(args):
+def predict(args, input_file: str):
+    name = os.path.basename(input_file).split(".")[0]
     cfg = load_cfg(args.cfg)
     ref_database = parse_database_name(args.database)
     estimator = name2estimator[cfg["type"]](cfg)
@@ -42,7 +46,7 @@ def predict(args):
 
     pose_init = None
     hist_pts = []
-    img = imread(args.input_file)
+    img = imread(input_file)
     # generate a pseudo K
     h, w, _ = img.shape
     f = np.sqrt(h**2 + w**2)
@@ -63,25 +67,15 @@ def predict(args):
     bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))
 
     center = cacluate_center(pts__)
+    width = caculate_distance(pts__[2], pts__[3])
+    height = caculate_distance(pts__[2], pts__[6])
     cv2.circle(bbox_img_, center, 5, (0, 255, 0), -1)
 
-    output_file_path = f"{args.output}/{args.name}-bbox.jpg"
-    print(f"Saving {args.name} bbox annotation output to: {output_file_path}")
+    output_file_path = f"{args.output}/{name}-bbox.jpg"
+    print(f"Saving bbox annotation output to: {output_file_path}")
     print("Center:", center)
+    print("Width:", width)
+    print("Height:", height)
+    print("-" * 20)
     imsave(output_file_path, bbox_img_)
-    return center
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--name", type=str, required=True)
-    parser.add_argument("--input_file", type=str, required=True)
-    parser.add_argument("--cfg", type=str, default="configs/gen6d_pretrain.yaml")
-    parser.add_argument("--database", type=str, default="custom/mouse")
-    parser.add_argument("--output", type=str, default="data/custom/mouse/test")
-
-    parser.add_argument("--num", type=int, default=5)
-    parser.add_argument("--std", type=float, default=2.5)
-
-    args = parser.parse_args()
-    predict(args)
+    return center, width, height

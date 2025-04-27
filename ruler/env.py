@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 task = "segment"
 
@@ -13,7 +14,7 @@ output_path = os.path.join("output_pictures")
 yolo_model_version = "train"
 taskFolder = os.path.join("runs", task)
 model_folder = os.path.join("runs", task, yolo_model_version)
-model_path = os.path.join(model_folder, "weights", "best.pt")
+model_path = Path(os.path.join(model_folder, "weights", "best.pt"))
 
 # Roboflow
 api_key = "AuWUC9FXJwD3HYlOXO2l"
