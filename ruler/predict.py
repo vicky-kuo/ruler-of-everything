@@ -6,10 +6,10 @@ from utils.other_utils import find_center
 import env
 
 
-def predict(args, input_file: str):
+def predict(args):
     model = YOLO(env.ruler_model_path)
-    results = model(input_file, verbose=False)
-    name = os.path.basename(input_file).split(".")[0]
+    results = model(args.input_path, verbose=False)
+    name = os.path.basename(args.input_path).split(".")[0]
 
     best_ruler_center = (0, 0)
     best_ruler_width = 0
@@ -36,7 +36,7 @@ def predict(args, input_file: str):
         if highest_confidence == -1.0:
             print("WARN! no ruler found in picture: " + result.path)
 
-        output_file_path = os.path.join(args.output, f"{name}-ruler.jpg")
+        output_file_path = os.path.join(args.output_path, f"{name}-ruler.jpg")
 
         print(f"Saving ruler annotation output to: {output_file_path}")
         print("Center:", best_ruler_center)

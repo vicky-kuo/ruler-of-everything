@@ -14,6 +14,7 @@ ruler_model_path = os.path.join(
     ruler_project_path, "runs", task, ruler_model_version, "weights", "best.pt"
 )
 
+# Gen6D env
 input_path = os.path.join("input_pictures")
 output_path = os.path.join("output_pictures")
 
@@ -26,18 +27,16 @@ class ObjectArgs:
         name: str,
         cfg: str,
         database: str,
-        input_path: str,
-        output: str,
+        input_file: str,
+        output_path: str,
         num: int = 5,
         std: float = 2.5,
     ):
         self.name = name
         self.cfg = cfg
         self.database = database
-        self.input_path = input_path
-        self.input_file1 = os.path.join(input_path, f"{str(name)}_1.jpg")
-        self.input_file2 = os.path.join(input_path, f"{str(name)}_2.jpg")
-        self.output = output_path
+        self.input_path = os.path.join(input_path, input_file)
+        self.output_path = output_path
         self.num = num
         self.std = std
 
@@ -46,6 +45,14 @@ girl_args = ObjectArgs(
     name="girl",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/girl",
-    input_path=input_path,
-    output=output_path,
+    input_file="girl_1.jpg",
+    output_path=output_path,
+)
+
+minion_args = ObjectArgs(
+    name="minion",
+    cfg="configs/gen6d_pretrain.yaml",
+    database="custom/minion",
+    input_file="minion_1.jpg",
+    output_path=output_path,
 )

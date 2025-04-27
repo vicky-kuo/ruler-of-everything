@@ -10,7 +10,6 @@ from estimator import name2estimator
 from utils.base_utils import load_cfg, project_points
 from utils.draw_utils import pts_range_to_bbox_pts, draw_bbox_3d
 from utils.pose_utils import pnp
-from utils.other_utils import caculate_distance
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -31,8 +30,8 @@ def cacluate_center(pts2d):
     return center
 
 
-def predict(args, input_file: str):
-    name = os.path.basename(input_file).split(".")[0]
+def predict(args):
+    name = os.path.basename(args.input_path).split(".")[0]
     cfg = load_cfg(args.cfg)
     ref_database = parse_database_name(args.database)
     estimator = name2estimator[cfg["type"]](cfg)
@@ -41,12 +40,16 @@ def predict(args, input_file: str):
     object_pts = get_ref_point_cloud(ref_database)
     object_bbox_3d = pts_range_to_bbox_pts(np.max(object_pts, 0), np.min(object_pts, 0))
 
-    output_dir = Path(args.output)
+    # Calculate the actual dimensions of the object in 3D space
+    max_pt = np.max(object_pts, 0)
+    min_pt = np.min(object_pts, 0)
+
+    output_dir = Path(args.output_path)
     output_dir.mkdir(exist_ok=True, parents=True)
 
     pose_init = None
     hist_pts = []
-    img = imread(input_file)
+    img = imread(args.input_path)
     # generate a pseudo K
     h, w, _ = img.shape
     f = np.sqrt(h**2 + w**2)
@@ -67,15 +70,18 @@ def predict(args, input_file: str):
     bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))
 
     center = cacluate_center(pts__)
-    width = caculate_distance(pts__[2], pts__[3])
-    height = caculate_distance(pts__[2], pts__[6])
+
     cv2.circle(bbox_img_, center, 5, (0, 255, 0), -1)
 
-    output_file_path = f"{args.output}/{name}-bbox.jpg"
+    output_file_path = f"{args.output_path}/{name}-bbox.jpg"
     print(f"Saving bbox annotation output to: {output_file_path}")
-    print("Center:", center)
-    print("Width:", width)
-    print("Height:", height)
-    print("-" * 20)
     imsave(output_file_path, bbox_img_)
-    return center, width, height
+
+    # Return pose, K, min/max points along with other info
+    return (
+        center,
+        pose_pr,  # Return the predicted pose
+        K,  # Return the camera intrinsics
+        min_pt,  # Return min point of object cloud
+        max_pt,  # Return max point of object cloud
+    )
