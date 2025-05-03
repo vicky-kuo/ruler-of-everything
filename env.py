@@ -10,7 +10,7 @@ ruler_input_path = os.path.join(ruler_project_path, "input_pictures")
 ruler_output_path = os.path.join(ruler_project_path, "output_pictures")
 
 ruler_model_version = "train"
-ruler_task_path = os.path.join(ruler_model_version, "runs", task)
+ruler_task_path = os.path.join(ruler_project_path, "runs", task)
 ruler_model_path = os.path.join(
     ruler_task_path, ruler_model_version, "weights", "best.pt"
 )

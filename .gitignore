@@ -177,7 +177,8 @@ cython_debug/
 /ruler/runs
 /ruler/dataset
 /ruler/output_pictures
-/ruler/yolo11n-seg.pt
+/yolo11n-seg.pt
+/yolo11n.pt
 
 # Gen6D stuff:
 /data
