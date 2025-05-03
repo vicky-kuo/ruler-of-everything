@@ -10,9 +10,16 @@ ruler_input_path = os.path.join(ruler_project_path, "input_pictures")
 ruler_output_path = os.path.join(ruler_project_path, "output_pictures")
 
 ruler_model_version = "train"
+ruler_task_path = os.path.join(ruler_model_version, "runs", task)
 ruler_model_path = os.path.join(
-    ruler_project_path, "runs", task, ruler_model_version, "weights", "best.pt"
+    ruler_task_path, ruler_model_version, "weights", "best.pt"
 )
+
+# Roboflow
+api_key = "AuWUC9FXJwD3HYlOXO2l"
+workspace = "size-estimation"
+project_name = "ruler-of-everything"
+roboflow_model_version = 2
 
 # Gen6D env
 input_path = os.path.join("input_pictures")
