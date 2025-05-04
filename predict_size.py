@@ -39,7 +39,7 @@ def get_3d_point_on_plane(point_2d, K, plane_point_cam, plane_normal_cam):
 
 
 # --- Main Script ---
-args = env.girl_args  # Or whichever args are appropriate
+args = env.minion_args  # Or whichever args are appropriate
 input_image_path = args.input_path
 output_path = args.output_path
 ruler_real_length_cm = 15.0

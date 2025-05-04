@@ -52,7 +52,7 @@ girl_args = ObjectArgs(
     name="girl",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/girl",
-    input_file="girl_1.jpg",
+    input_file="girl_2.jpg",
     output_path=output_path,
 )
 
@@ -60,6 +60,6 @@ minion_args = ObjectArgs(
     name="minion",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/minion",
-    input_file="minion_1.jpg",
+    input_file="minion_4.jpg",
     output_path=output_path,
 )

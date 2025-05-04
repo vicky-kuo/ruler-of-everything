@@ -1,4 +1,3 @@
-
 torchvision
 opencv-python
 transforms3d
@@ -10,3 +9,4 @@ open3d
 pyyaml
 tensorboardX
 tqdm
+open3d
