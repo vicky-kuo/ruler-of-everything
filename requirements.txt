@@ -10,3 +10,5 @@ pyyaml
 tensorboardX
 tqdm
 open3d
+pyvista
+vtk

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 # ruler env
 task = "segment"
@@ -22,8 +23,8 @@ project_name = "ruler-of-everything"
 roboflow_model_version = 2
 
 # Gen6D env
-input_path = os.path.join("input_pictures")
-output_path = os.path.join("output_pictures")
+input_path = os.path.join("input")
+output_path = os.path.join("output")
 
 ffmpeg_path = os.path.join("Program Files", "ffmpeg", "bin", "ffmpeg.exe")
 
@@ -52,7 +53,7 @@ girl_args = ObjectArgs(
     name="girl",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/girl",
-    input_file="girl_2.jpg",
+    input_file="girl_1.jpg",
     output_path=output_path,
 )
 
@@ -60,6 +61,21 @@ minion_args = ObjectArgs(
     name="minion",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/minion",
-    input_file="minion_4.jpg",
+    input_file="minion_1.jpg",
     output_path=output_path,
 )
+
+
+class Model:
+    def __init__(
+        self, name: str, rotation: float = 0.0, rotate_axis: list = np.zeros(3)
+    ):
+        self.name = name
+        self.input_path = os.path.join(input_path, name)
+        self.obj_path = os.path.join(self.input_path, name + ".obj")
+        self.mtl_path = os.path.join(self.input_path, name + ".mtl")
+        self.rotation = rotation
+        self.rotate_axis = rotate_axis
+
+
+soda_can_model = Model("soda_can", np.pi / 2, [1, 0, 0])
