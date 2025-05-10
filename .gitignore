@@ -183,4 +183,4 @@ cython_debug/
 # Gen6D stuff:
 /data
 
-/output_pictures
+/output

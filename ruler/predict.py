@@ -1,63 +1,81 @@
+from pathlib import Path
+from skimage.io import imread, imsave
 from ultralytics import YOLO
 import numpy as np
-import os
 import cv2
 from utils.other_utils import find_center
 import env
 
 
-def predict(args):
-    model = YOLO(env.ruler_model_path)
-    results = model(args.input_path, verbose=False)
-    name = os.path.basename(args.input_path).split(".")[0]
+def predict(
+    input_image_path: Path,
+    output_image_path: Path,
+) -> tuple[tuple[int, int] | None, float | None]:
+    """
+    Predicts ruler center and pixel length from an image, saves an annotated image.
 
-    best_ruler_center = (0, 0)
-    best_ruler_width = 0
+    Args:
+        input_image_path: Path to the input image.
+        output_annotated_image_path: Path to save the image with ruler annotations.
+        ruler_model_config_path: Path to the YOLO model for ruler detection.
+
+    Returns:
+        tuple: (
+            (center_x, center_y): tuple[int, int] or None if no ruler found,
+            pixel_length: float or None if no ruler found,
+        )
+    """
+    model = YOLO(env.ruler_model_path)
+    results = model(input_image_path, verbose=False)
+
+    best_ruler_center = None
+    best_ruler_width = None
     highest_confidence = -1.0
+    img = None
+
+    if not results:
+        print(f"WARN! YOLO model returned no results for: {input_image_path}")
+        img = imread(input_image_path)
+        imsave(output_image_path, img)
+        print(
+            f"Saved original image to {output_image_path} as no YOLO results were found."
+        )
+        return None, None
 
     for result in results:
         img = result.plot()
 
         if hasattr(result.masks, "xy") and hasattr(result.boxes, "conf"):
-            for mask, box in zip(result.masks.xy, result.boxes):
-                label = model.names[box.cls.tolist().pop()]
-                confidence = box.conf.tolist().pop()
+            for mask_points, box in zip(result.masks.xy, result.boxes):
+                label = model.names[int(box.cls[0])]
+                confidence = float(box.conf[0])
 
                 if label == "ruler":
                     if confidence > highest_confidence:
                         highest_confidence = confidence
-                        points = np.int32([mask])
-                        best_ruler_center = find_center(points)
+                        points = np.int32([mask_points])
+                        current_center = find_center(points)
                         min_x = np.min(points[:, :, 0])
                         max_x = np.max(points[:, :, 0])
-                        best_ruler_width = max_x - min_x
+                        current_width = max_x - min_x
+
+                        best_ruler_center = current_center
+                        best_ruler_width = float(current_width)
                         cv2.circle(img, best_ruler_center, 5, (0, 255, 0), -1)
+        else:
+            print(f"WARN! No masks or boxes found in results for: {input_image_path}")
 
-        if highest_confidence == -1.0:
-            print("WARN! no ruler found in picture: " + result.path)
+    if highest_confidence == -1.0:
+        print(f"WARN! No ruler found in picture: {input_image_path}")
 
-        output_file_path = os.path.join(args.output_path, f"{name}-ruler.jpg")
-
-        print(f"Saving ruler annotation output to: {output_file_path}")
-        print("Center:", best_ruler_center)
-        print("Width:", best_ruler_width)
-        print("-" * 20)
-        cv2.imwrite(output_file_path, img)
+    if img is not None:
+        print(f"Saving ruler annotation output to: {output_image_path}")
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        imsave(output_image_path, img)
+    else:
+        print(
+            f"Error: Image data for annotation was not available for {input_image_path}. Cannot save."
+        )
+        return None, None
 
     return best_ruler_center, best_ruler_width
-
-
-def _test():
-    args = type("ObjectArgs", (object,), {})()
-    args.output_path = env.output_path
-
-    filenames = [file for file in os.listdir(env.input_path)]
-
-    for filename in filenames:
-        args.name = filename.split(".")[0]
-        _, _ = predict(args, os.path.join(env.input_path, filename))
-
-
-# test the predict function
-if __name__ == "__main__":
-    _test()

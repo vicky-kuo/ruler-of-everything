@@ -1,14 +1,12 @@
-from pathlib import Path
-import os
 import numpy as np
 import cv2
 import warnings
 from skimage.io import imsave, imread
+from pathlib import Path
 
-from dataset.database import parse_database_name, get_ref_point_cloud
-from estimator import name2estimator
-from utils.base_utils import load_cfg, project_points
-from utils.draw_utils import pts_range_to_bbox_pts, draw_bbox_3d
+from estimator import Gen6DEstimator
+from utils.base_utils import project_points
+from utils.draw_utils import draw_bbox_3d
 from utils.pose_utils import pnp
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -30,58 +28,40 @@ def cacluate_center(pts2d):
     return center
 
 
-def predict(args):
-    name = os.path.basename(args.input_path).split(".")[0]
-    cfg = load_cfg(args.cfg)
-    ref_database = parse_database_name(args.database)
-    estimator = name2estimator[cfg["type"]](cfg)
-    estimator.build(ref_database, split_type="all")
-
-    object_pts = get_ref_point_cloud(ref_database)
-    object_bbox_3d = pts_range_to_bbox_pts(np.max(object_pts, 0), np.min(object_pts, 0))
-
-    # Calculate the actual dimensions of the object in 3D space
-    max_pt = np.max(object_pts, 0)
-    min_pt = np.min(object_pts, 0)
-
-    output_dir = Path(args.output_path)
-    output_dir.mkdir(exist_ok=True, parents=True)
-
-    pose_init = None
-    hist_pts = []
-    img = imread(args.input_path)
-    # generate a pseudo K
-    h, w, _ = img.shape
-    f = np.sqrt(h**2 + w**2)
-    K = np.asarray([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1]], np.float32)
+def predict(
+    input_image_path: Path,
+    output_image_path: Path,
+    K_matrix: np.ndarray,
+    estimator: Gen6DEstimator,
+    obj_bbox_3d: np.ndarray,
+    hist_pts: list,
+    pose_init: np.ndarray | None,
+    smoothing_num: int,
+    smoothing_std: float,
+) -> tuple[np.ndarray, np.ndarray]:
     if pose_init is not None:
-        estimator.cfg["refine_iter"] = 1  # we only refine one time after initialization
-    pose_pr, inter_results = estimator.predict(img, K, pose_init=pose_init)
-    pose_init = pose_pr
-    pts, _ = project_points(object_bbox_3d, pose_pr, K)
-    bbox_img = draw_bbox_3d(img, pts, (0, 0, 255))
-    # imsave(f'{str(output_dir)}/images_out/{que_id}-bbox.jpg', bbox_img)
-    # np.save(f'{str(output_dir)}/images_out/{que_id}-pose.npy', pose_pr)
-    # imsave(f'{str(output_dir)}/images_inter/{que_id}.jpg', visualize_intermediate_results(img, K, inter_results, estimator.ref_info, object_bbox_3d))
+        estimator.cfg["refine_iter"] = 1
+
+    img = imread(input_image_path)
+
+    pose_pr, _ = estimator.predict(img, K_matrix, pose_init=pose_init)
+    pts, _ = project_points(obj_bbox_3d, pose_pr, K_matrix)
+
+    # hist_pts = []
+    print(hist_pts)
     hist_pts.append(pts)
-    pts_ = weighted_pts(hist_pts, weight_num=args.num, std_inv=args.std)
-    pose_ = pnp(object_bbox_3d, pts_, K)
-    pts__, _ = project_points(object_bbox_3d, pose_, K)
-    bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))
+    pts_ = weighted_pts(hist_pts, weight_num=smoothing_num, std_inv=smoothing_std)
+    pose_ = pnp(obj_bbox_3d, pts_, K_matrix)  # Smoothed pose
+    pts__, _ = project_points(obj_bbox_3d, pose_, K_matrix)
+    bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))  # Draw smoothed bbox
 
     center = cacluate_center(pts__)
-
     cv2.circle(bbox_img_, center, 5, (0, 255, 0), -1)
 
-    output_file_path = f"{args.output_path}/{name}-bbox.jpg"
-    print(f"Saving bbox annotation output to: {output_file_path}")
-    imsave(output_file_path, bbox_img_)
+    print(f"Saving Gen6D bbox annotation output to: {output_image_path}")
+    imsave(output_image_path, bbox_img_)
 
-    # Return pose, K, min/max points along with other info
     return (
-        center,
-        pose_pr,  # Return the predicted pose
-        K,  # Return the camera intrinsics
-        min_pt,  # Return min point of object cloud
-        max_pt,  # Return max point of object cloud
+        pose_,  # Return the smoothed pose
+        pose_pr,  # Current raw prediction becomes pose_init for the next frame
     )

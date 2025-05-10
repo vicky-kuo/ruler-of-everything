@@ -1,5 +1,6 @@
 import os
 import cv2
+import numpy as np
 from skimage.io import imsave, imread
 
 
@@ -8,9 +9,11 @@ def get_absolute_path(path: str):
     return os.path.join(absolute_path, path)
 
 
-def find_center(mask):
+def find_center(mask) -> np.ndarray:
     m = cv2.moments(mask)
-    return (int(m["m10"] / m["m00"]), int(m["m01"] / m["m00"]))
+    return np.array(
+        [int(m["m10"] / m["m00"]), int(m["m01"] / m["m00"])], dtype=np.int32
+    )
 
 
 def caculate_distance(point1, point2):

@@ -10,7 +10,7 @@ ruler_data_path = os.path.join(ruler_dataset_path, "data.yaml")
 ruler_input_path = os.path.join(ruler_project_path, "input_pictures")
 ruler_output_path = os.path.join(ruler_project_path, "output_pictures")
 
-ruler_model_version = "train"
+ruler_model_version = "train2"
 ruler_task_path = os.path.join(ruler_project_path, "runs", task)
 ruler_model_path = os.path.join(
     ruler_task_path, ruler_model_version, "weights", "best.pt"
@@ -26,7 +26,7 @@ roboflow_model_version = 2
 input_path = os.path.join("input")
 output_path = os.path.join("output")
 
-ffmpeg_path = os.path.join("Program Files", "ffmpeg", "bin", "ffmpeg.exe")
+ffmpeg_path = os.path.join("C:/", "Program Files", "ffmpeg", "bin", "ffmpeg.exe")
 
 
 class ObjectArgs:
@@ -53,7 +53,7 @@ girl_args = ObjectArgs(
     name="girl",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/girl",
-    input_file="girl_1.jpg",
+    input_file="girl_2.jpg",
     output_path=output_path,
 )
 
