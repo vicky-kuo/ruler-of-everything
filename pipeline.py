@@ -27,7 +27,7 @@ def main():
     video_name = Path("video_2.mp4")
     input_video_path = env.input_path / video_name
     base_output_path = Path(env.output_path) / video_name.stem
-    # shutil.rmtree(base_output_path, ignore_errors=True)
+    shutil.rmtree(base_output_path, ignore_errors=True)
 
     # Convert video to frames
     raw_frames_path = base_output_path / "raw"
