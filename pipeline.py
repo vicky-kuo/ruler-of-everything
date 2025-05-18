@@ -20,7 +20,7 @@ from utils.draw_utils import pts_range_to_bbox_pts
 import re
 
 
-obj_args_list = [env.girl_args, env.minion_args]
+obj_args_list = [env.girl_args, env.big_minion_args]
 model_args = [env.soda_can_model, env.soda_bottle_model]
 ruler_real_length_cm = 15.0
 interval = 3

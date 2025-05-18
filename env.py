@@ -65,6 +65,14 @@ minion_args = ObjectArgs(
     output_path=output_path,
 )
 
+big_minion_args = ObjectArgs(
+    name="minion",
+    cfg="configs/gen6d_pretrain.yaml",
+    database="custom/big_minion",
+    input_file="big_minion_1.jpg",
+    output_path=output_path,
+)
+
 
 class Model:
     def __init__(
