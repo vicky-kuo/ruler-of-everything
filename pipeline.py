@@ -7,7 +7,9 @@ import numpy as np
 from prepare import video2image
 from ruler.predict import predict as ruler_predict
 from predict_frame import predict as gen6d_predict
-from predict_size import predict_size
+from predict_frame import draw as gen6d_draw
+from predict_size import predict as size_predict
+from predict_size import draw as size_draw
 from ar import render as ar_render
 
 import env
@@ -21,6 +23,7 @@ import re
 obj_args_list = [env.girl_args, env.minion_args]
 ar_model_to_render = env.soda_can_model
 ruler_real_length_cm = 15.0
+interval = 10
 
 
 def main():
@@ -32,12 +35,14 @@ def main():
     # Convert video to frames
     raw_frames_path = base_output_path / "raw"
     ruler_frames_path = base_output_path / "ruler"
+    size_frames_path = base_output_path / "sized"
 
     raw_frames_path.mkdir(parents=True, exist_ok=True)
     ruler_frames_path.mkdir(parents=True, exist_ok=True)
+    size_frames_path.mkdir(parents=True, exist_ok=True)
     print(f"Converting video to frames in {raw_frames_path}...")
     frame_num = video2image(
-        input_video_path, raw_frames_path, interval=1, image_size=640
+        input_video_path, raw_frames_path, interval=interval, image_size=640
     )
 
     frame_files = sorted(
@@ -51,24 +56,24 @@ def main():
 
     print(f"Found {frame_num} frames to process.")
 
-    # # --- 2. Initialize Gen6D estimators ---
+    # --- 2. Initialize Gen6D estimators ---
     estimators = {}
     obj_bboxes_3d = {}
     min_pts = {}
     max_pts = {}
     hist_pts = {obj_args.name: [] for obj_args in obj_args_list}
-    pose_inits = {obj_args.name: None for obj_args in obj_args_list}
+    pose_inits: dict[str, np.ndarray | None] = {
+        obj_args.name: None for obj_args in obj_args_list
+    }
 
     for obj_args in obj_args_list:
         obj_name = obj_args.name
 
         obj_output_base_path = base_output_path / obj_name
         gen6d_frames_path = obj_output_base_path / "gen6d"
-        size_frames_path = obj_output_base_path / "sized"
         ar_frames_path = obj_output_base_path / "ar"
 
         gen6d_frames_path.mkdir(parents=True, exist_ok=True)
-        size_frames_path.mkdir(parents=True, exist_ok=True)
         ar_frames_path.mkdir(parents=True, exist_ok=True)
 
         print(f"Initializing estimator for {obj_name}...")
@@ -93,41 +98,32 @@ def main():
 
     # --- 3 & 4. Process each frame ---
     for frame_path in frame_files:
-        current_image_path = frame_path
+        current_raw_frame_path = frame_path
         frame_name = frame_path.stem
         print("-" * 20 + frame_name + "-" * 20)
 
         # --- 3a. Ruler Prediction ---
         ruler_annotated_image_path = ruler_frames_path / f"{frame_name}_ruler.jpg"
-        print(f"Ruler predict on {current_image_path}")
+        print(f"Ruler predict on {current_raw_frame_path}")
 
-        ruler_center_2d, ruler_pixel_length = ruler_predict(
-            input_image_path=current_image_path,
+        ruler_center, ruler_pixel_length = ruler_predict(
+            input_image_path=current_raw_frame_path,
             output_image_path=ruler_annotated_image_path,
         )
-        current_image_path = ruler_annotated_image_path
 
-        # --- Loop through each obj for Gen6D, Size, AR ---
         model_idx = 0
+        gen6d_predictions = []
+        size_predictions = []
+
         for obj_args in obj_args_list:
             obj_name = obj_args.name
-            obj_output_base_path = base_output_path / obj_name
-            gen6d_frames_path = obj_output_base_path / "gen6d"
-            size_frames_path = obj_output_base_path / "sized"
-            ar_frames_path = obj_output_base_path / "ar"
 
             print("-" * 20 + f"{obj_name}" + "-" * 20)
             # --- 4a. Gen6D Prediction (predict_frame.py) ---
-            gen6d_annotated_image_path = gen6d_frames_path / f"{frame_name}_gen6d.jpg"
-            print(f"Gen6D predict on {current_image_path}")
-
+            print(f"  Gen6D predict for {obj_name} on {current_raw_frame_path.name}")
             try:
-                (
-                    pose_pr,
-                    next_pose_init,
-                ) = gen6d_predict(
-                    input_image_path=current_image_path,
-                    output_image_path=str(gen6d_annotated_image_path),
+                gen6d_prediction = gen6d_predict(
+                    input_image_path=current_raw_frame_path,
                     K_matrix=K,
                     estimator=estimators[obj_name],
                     obj_bbox_3d=obj_bboxes_3d[obj_name],
@@ -136,36 +132,33 @@ def main():
                     smoothing_num=obj_args.num,
                     smoothing_std=obj_args.std,
                 )
-                current_image_path = gen6d_annotated_image_path
-
-                pose_inits[obj_name] = next_pose_init
+                pose_inits[obj_name] = gen6d_prediction["pose"]
+                gen6d_predictions.append(gen6d_prediction)
 
             except Exception as e:
-                print(f"Error in Gen6D prediction: {e}")
+                print(f"  Error in Gen6D prediction for {obj_name}: {e}")
                 continue
 
-            # --- 4b. Size Prediction (predict_size.py) ---
-            if ruler_center_2d is None or ruler_pixel_length is None:
-                print("Skipping size prediction as ruler detection failed.")
-            else:
-                size_annotated_image_path = size_frames_path / f"{frame_name}_sized.jpg"
-                print(f"Size predict on {current_image_path}")
-                predict_size(
-                    input_image_path=current_image_path,
-                    output_image_path=size_annotated_image_path,
-                    pose_pr=pose_pr,
+            if ruler_center is not None and ruler_pixel_length is not None:
+                size_prediction = size_predict(
+                    pose=gen6d_prediction["pose"],
                     K_matrix=K,
                     min_pt=min_pts[obj_name],
                     max_pt=max_pts[obj_name],
-                    ruler_center_2d=ruler_center_2d,
+                    ruler_center_2d=ruler_center,
                     ruler_pixel_length=ruler_pixel_length,
                     ruler_real_length_cm=ruler_real_length_cm,
-                    obj_args_name=obj_name,
-                    idx=model_idx,
+                    obj_name=obj_name,
                 )
-                current_image_path = size_annotated_image_path
+                size_predictions.append(size_prediction)
 
-            # --- 4c. AR Rendering (ar.py) ---
+        # --- Draw ---
+        current_image_path = ruler_annotated_image_path
+        model_idx = 0
+        for obj_args in obj_args_list:
+            obj_name = obj_args.name
+            obj_output_base_path = base_output_path / obj_name
+            ar_frames_path = obj_output_base_path / "ar"
             ar_annotated_image_path = ar_frames_path / f"{frame_name}_ar.jpg"
             print(
                 f"AR render (using model {ar_model_to_render.name}) on {current_image_path}"
@@ -174,24 +167,48 @@ def main():
                 input_image_path=current_image_path,
                 output_image_path=ar_annotated_image_path,
                 model_args=ar_model_to_render,
-                pose_target=pose_pr,
+                pose_target=gen6d_predictions[model_idx]["pose"],
                 K_matrix=K,
                 target_min_pt=min_pts[obj_name],
                 target_max_pt=max_pts[obj_name],
             )
             current_image_path = ar_annotated_image_path
+            gen6d_frames_path = obj_output_base_path / "gen6d"
+            gen6d_annotated_image_path = gen6d_frames_path / f"{frame_name}_gen6d.jpg"
+            print(f"Saving Gen6D annotated image to {gen6d_annotated_image_path}")
+            gen6d_draw(
+                input_image_path=current_image_path,
+                output_image_path=gen6d_annotated_image_path,
+                pts=gen6d_predictions[model_idx]["pts"],
+                save=True,
+            )
+            current_image_path = gen6d_annotated_image_path
+            model_idx += 1
 
-            model_idx = model_idx + 1
+        for obj_args in obj_args_list:
+            obj_name = obj_args.name
+            size_frames_path = base_output_path / "sized"
+            size_annotated_image_path = size_frames_path / f"{frame_name}_sized.jpg"
+            print(f"Saving size annotated image to {size_annotated_image_path}")
+            size_draw(
+                input_image_path=current_image_path,
+                output_image_path=size_annotated_image_path,
+                sizes=size_predictions,
+                save=True,
+            )
+
+        model_idx = model_idx + 1
 
     list_file = base_output_path / "frames.txt"
     output_files = sorted(
-        [f for f in Path(base_output_path / "minion" / "ar").iterdir() if f.is_file()],
-        key=lambda p: int(re.search(r"frame(\d+)_ar", p.stem).group(1)),
+        [f for f in Path(base_output_path / "sized").iterdir() if f.is_file()],
+        key=lambda p: int(re.search(r"frame(\d+)_sized", p.stem).group(1)),
     )
     with open(list_file, "w") as f:
         for frame_file in output_files:
             f.write(f"file '{frame_file.absolute()}'\n")
 
+    output_fps_str = f"{30 / interval}"
     cmd = [
         env.ffmpeg_path,
         "-f",
@@ -200,16 +217,12 @@ def main():
         "0",
         "-i",
         str(list_file),
-        "-framerate",
-        "30",
         "-r",
-        "30",
+        output_fps_str,
         "-vf",
-        "scale=640:-2",  # Keep width 640, make height even
+        f"scale=640:-2,settb=AVTB,setpts=N/{output_fps_str}/TB,fps={output_fps_str}",  # Keep width 640, make height even
         "-c:v",
         "libx264",
-        "-pix_fmt",
-        "yuv420p",
         f"{base_output_path}/{video_name}",
     ]
     subprocess.run(cmd)

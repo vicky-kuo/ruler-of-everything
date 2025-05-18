@@ -1,7 +1,6 @@
 import numpy as np
-import cv2
 import warnings
-from skimage.io import imsave, imread
+from skimage.io import imread, imsave
 from pathlib import Path
 
 from estimator import Gen6DEstimator
@@ -12,7 +11,7 @@ from utils.pose_utils import pnp
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def weighted_pts(pts_list, weight_num=10, std_inv=10):
+def weighted_pts(pts_list, weight_num=10, std_inv: float = 10):
     weights = np.exp(-((np.arange(weight_num) / std_inv) ** 2))[::-1]  # wn
     pose_num = len(pts_list)
     if pose_num < weight_num:
@@ -23,14 +22,8 @@ def weighted_pts(pts_list, weight_num=10, std_inv=10):
     return pts
 
 
-def cacluate_center(pts2d):
-    center = tuple(map(int, np.mean(pts2d, axis=0)))
-    return center
-
-
 def predict(
     input_image_path: Path,
-    output_image_path: Path,
     K_matrix: np.ndarray,
     estimator: Gen6DEstimator,
     obj_bbox_3d: np.ndarray,
@@ -38,7 +31,7 @@ def predict(
     pose_init: np.ndarray | None,
     smoothing_num: int,
     smoothing_std: float,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> dict:
     if pose_init is not None:
         estimator.cfg["refine_iter"] = 1
 
@@ -47,21 +40,24 @@ def predict(
     pose_pr, _ = estimator.predict(img, K_matrix, pose_init=pose_init)
     pts, _ = project_points(obj_bbox_3d, pose_pr, K_matrix)
 
-    # hist_pts = []
-    print(hist_pts)
     hist_pts.append(pts)
     pts_ = weighted_pts(hist_pts, weight_num=smoothing_num, std_inv=smoothing_std)
     pose_ = pnp(obj_bbox_3d, pts_, K_matrix)  # Smoothed pose
-    pts__, _ = project_points(obj_bbox_3d, pose_, K_matrix)
-    bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))  # Draw smoothed bbox
+    pts__, _ = project_points(
+        obj_bbox_3d, pose_, K_matrix
+    )  # 2D points of the smoothed pose
 
-    center = cacluate_center(pts__)
-    cv2.circle(bbox_img_, center, 5, (0, 255, 0), -1)
+    return {
+        "pose": pose_,
+        "pts": pts__,
+    }
 
-    print(f"Saving Gen6D bbox annotation output to: {output_image_path}")
-    imsave(output_image_path, bbox_img_)
 
-    return (
-        pose_,  # Return the smoothed pose
-        pose_pr,  # Current raw prediction becomes pose_init for the next frame
-    )
+def draw(
+    input_image_path: Path, output_image_path: Path, pts: np.ndarray, save: bool = True
+) -> np.ndarray:
+    img = imread(input_image_path)
+    bbox_img = draw_bbox_3d(img, pts, (0, 0, 255))
+    if save:
+        imsave(output_image_path, bbox_img)
+    return bbox_img

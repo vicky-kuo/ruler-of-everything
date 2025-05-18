@@ -113,9 +113,9 @@ def draw_keypoints(img, kps, colors=None, radius=2):
             cv2.circle(out_img, tuple(pt), radius, color, -1)
         else:
             cv2.circle(out_img, tuple(pt), radius, (0, 255, 0), -1)
-        cv2.putText(
-            out_img, str(pi), tuple(pt), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1
-        )
+        # cv2.putText(
+        #     out_img, str(pi), tuple(pt), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1
+        # )
     return out_img
 
 

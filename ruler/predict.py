@@ -10,21 +10,7 @@ import env
 def predict(
     input_image_path: Path,
     output_image_path: Path,
-) -> tuple[tuple[int, int] | None, float | None]:
-    """
-    Predicts ruler center and pixel length from an image, saves an annotated image.
-
-    Args:
-        input_image_path: Path to the input image.
-        output_annotated_image_path: Path to save the image with ruler annotations.
-        ruler_model_config_path: Path to the YOLO model for ruler detection.
-
-    Returns:
-        tuple: (
-            (center_x, center_y): tuple[int, int] or None if no ruler found,
-            pixel_length: float or None if no ruler found,
-        )
-    """
+) -> tuple[np.ndarray | None, float | None]:
     model = YOLO(env.ruler_model_path)
     results = model(input_image_path, verbose=False)
 
