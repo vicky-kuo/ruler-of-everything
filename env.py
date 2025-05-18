@@ -41,8 +41,8 @@ class ObjectArgs:
         database: str,
         input_file: str,
         output_path: str,
-        num: int = 5,
-        std: float = 2.5,
+        num: int = 10,
+        std: float = 10,
     ):
         self.name = name
         self.cfg = cfg
@@ -93,7 +93,7 @@ class Model:
         self.rotations = rotations
 
 
-soda_can_model = Model("soda_can", (0, 15), [(np.pi / 2, [1, 0, 0])])
+soda_can_model = Model("soda_can", (0, 16), [(np.pi / 2, [1, 0, 0])])
 soda_bottle_model = Model(
-    "bottle", (15, 999), [(np.pi / 2, [1, 0, 0]), (-np.pi / 8, [0, 0, 1])]
+    "bottle", (16, 999), [(np.pi / 2, [1, 0, 0]), (-np.pi / 8, [0, 0, 1])]
 )

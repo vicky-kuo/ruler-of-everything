@@ -103,9 +103,9 @@ def predict(
     units_per_cm = ruler_dist_3d_cam / ruler_real_length_cm
     logger.debug(f"Scale factor: {units_per_cm:.4f} camera units per cm")
 
-    width_units = max_pt[0] - min_pt[0]
-    height_units = max_pt[1] - min_pt[1]
-    depth_units = max_pt[2] - min_pt[2]
+    depth_units = max_pt[0] - min_pt[0]
+    width_units = max_pt[1] - min_pt[1]
+    height_units = max_pt[2] - min_pt[2]
 
     real_width_cm = width_units / units_per_cm
     real_height_cm = height_units / units_per_cm
