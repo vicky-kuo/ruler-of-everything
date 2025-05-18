@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 import pyvista as pv
 from pathlib import Path
-from skimage.io import imread
+from skimage.io import imread, imsave
 import os
 import transforms3d
 import math
@@ -102,12 +102,7 @@ def render(
                 parts = line.strip().split()
                 if len(parts) < 2:
                     continue
-                if (
-                    parts[0] == "map_Kd"
-                    or parts[0] == "map_Ka"
-                    or parts[0] == "norm"
-                    or parts[0] == "map_Pm"
-                ):
+                if parts[0] == "map_Kd":
                     texture_file = parts[1]
                     if not os.path.isabs(texture_file):
                         texture_file = os.path.join(mtl_base_dir, texture_file)
@@ -132,6 +127,9 @@ def render(
 
         for current_material_id in unique_material_ids:
             mesh_part = model_mesh.extract_cells(material_ids == current_material_id)
+            print(
+                f"Processing mesh part for Material ID: {current_material_id} with {mesh_part.n_points} points and {mesh_part.n_cells} cells"
+            )
             if mesh_part.n_points == 0 or mesh_part.n_cells == 0:
                 print(
                     f"  Skipping empty mesh part for Material ID: {current_material_id}"
@@ -142,7 +140,7 @@ def render(
             mesh_part.points = transform_vertices_local(part_original_vertices)
             mesh_part_texture = None
 
-            if 0 <= current_material_id < len(texture_paths):
+            if current_material_id < len(texture_paths):
                 texture_file_path = texture_paths[current_material_id]
                 print(
                     f"  Attempting to load texture: {texture_file_path} for material index {current_material_id}"
@@ -152,6 +150,7 @@ def render(
                 print(
                     f"  Warning: Material index {current_material_id} is out of bounds for texture_paths (len: {len(texture_paths)}) or no textures defined."
                 )
+                # mesh_part_texture = pv.read_texture(texture_paths[0])
             plotter.add_mesh(
                 mesh_part,
                 smooth_shading=True,
@@ -184,7 +183,8 @@ def render(
         f"Configured PyVista camera: FoV={fov_y:.2f}, WindowCenter=({window_center_x:.3f}, {window_center_y:.3f})"
     )
 
-    plotter.screenshot(output_image_path, transparent_background=False)
+    img = plotter.screenshot(transparent_background=False)
+    imsave(output_image_path, img)
     print(f"Saved AR output image to: {output_image_path}")
 
     plotter.close()

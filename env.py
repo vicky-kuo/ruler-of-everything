@@ -68,14 +68,20 @@ minion_args = ObjectArgs(
 
 class Model:
     def __init__(
-        self, name: str, rotation: float = 0.0, rotate_axis: list = np.zeros(3)
+        self,
+        name: str,
+        range_cm: tuple[float, float],
+        rotation: float = 0.0,
+        rotate_axis: list = [np.zeros(3, dtype=float)],
     ):
         self.name = name
         self.input_path = os.path.join(input_path, name)
         self.obj_path = os.path.join(self.input_path, name + ".obj")
         self.mtl_path = os.path.join(self.input_path, name + ".mtl")
+        self.range_cm = range_cm
         self.rotation = rotation
         self.rotate_axis = rotate_axis
 
 
-soda_can_model = Model("soda_can", np.pi / 2, [1, 0, 0])
+soda_can_model = Model("soda_can", (0, 15), np.pi / 2, [1, 0, 0])
+soda_bottle_model = Model("bottle", (15, 999), np.pi / 2, [1, 0, 0])

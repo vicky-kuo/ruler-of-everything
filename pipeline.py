@@ -21,13 +21,13 @@ import re
 
 
 obj_args_list = [env.girl_args, env.minion_args]
-ar_model_to_render = env.soda_can_model
+model_args = [env.soda_can_model, env.soda_bottle_model]
 ruler_real_length_cm = 15.0
-interval = 10
+interval = 3
 
 
 def main():
-    video_name = Path("video_2.mp4")
+    video_name = Path("video_3.mp4")
     input_video_path = env.input_path / video_name
     base_output_path = Path(env.output_path) / video_name.stem
     shutil.rmtree(base_output_path, ignore_errors=True)
@@ -65,7 +65,7 @@ def main():
     pose_inits: dict[str, np.ndarray | None] = {
         obj_args.name: None for obj_args in obj_args_list
     }
-
+    ar_models = []
     for obj_args in obj_args_list:
         obj_name = obj_args.name
 
@@ -91,6 +91,8 @@ def main():
         estimators[obj_name] = estimator
         estimator.build(database, split_type="all")
 
+        ar_models.append(model_args[0])
+
     img = imread(frame_files[0])
     h, w, _ = img.shape
     f = np.sqrt(h**2 + w**2)
@@ -106,7 +108,8 @@ def main():
         ruler_annotated_image_path = ruler_frames_path / f"{frame_name}_ruler.jpg"
         print(f"Ruler predict on {current_raw_frame_path}")
 
-        ruler_center, ruler_pixel_length = ruler_predict(
+        # MODIFIED: ruler_predict now returns two endpoints
+        ruler_endpoint1, ruler_endpoint2 = ruler_predict(
             input_image_path=current_raw_frame_path,
             output_image_path=ruler_annotated_image_path,
         )
@@ -139,34 +142,66 @@ def main():
                 print(f"  Error in Gen6D prediction for {obj_name}: {e}")
                 continue
 
-            if ruler_center is not None and ruler_pixel_length is not None:
+            # MODIFIED: Pass endpoints to size_predict
+            if ruler_endpoint1 is not None and ruler_endpoint2 is not None:
                 size_prediction = size_predict(
                     pose=gen6d_prediction["pose"],
                     K_matrix=K,
                     min_pt=min_pts[obj_name],
                     max_pt=max_pts[obj_name],
-                    ruler_center_2d=ruler_center,
-                    ruler_pixel_length=ruler_pixel_length,
+                    ruler_pt1_2d=ruler_endpoint1,  # MODIFIED
+                    ruler_pt2_2d=ruler_endpoint2,  # MODIFIED
                     ruler_real_length_cm=ruler_real_length_cm,
                     obj_name=obj_name,
                 )
                 size_predictions.append(size_prediction)
+            else:
+                print(
+                    f"  Skipping size prediction for {obj_name} due to missing ruler information."
+                )
+                # Append a placeholder or handle missing size prediction as needed
+                size_predictions.append(
+                    {
+                        "name": obj_name,
+                        "width": None,
+                        "height": None,
+                        "depth": None,
+                    }
+                )
 
         # --- Draw ---
         current_image_path = ruler_annotated_image_path
         model_idx = 0
+
         for obj_args in obj_args_list:
             obj_name = obj_args.name
             obj_output_base_path = base_output_path / obj_name
             ar_frames_path = obj_output_base_path / "ar"
             ar_annotated_image_path = ar_frames_path / f"{frame_name}_ar.jpg"
+
+            for model in model_args:
+                if (
+                    size_predictions[model_idx]["width"] is None
+                    or size_predictions[model_idx]["height"] is None
+                    or size_predictions[model_idx]["depth"] is None
+                ):
+                    break
+                max_axis = max(
+                    size_predictions[model_idx]["width"],
+                    size_predictions[model_idx]["height"],
+                    size_predictions[model_idx]["depth"],
+                )
+                if max_axis >= model.range_cm[0] and max_axis < model.range_cm[1]:
+                    ar_models[model_idx] = model
+                    break
+
             print(
-                f"AR render (using model {ar_model_to_render.name}) on {current_image_path}"
+                f"AR render (using model {ar_models[model_idx].name}) on {current_image_path}"
             )
             ar_render(
                 input_image_path=current_image_path,
                 output_image_path=ar_annotated_image_path,
-                model_args=ar_model_to_render,
+                model_args=ar_models[model_idx],
                 pose_target=gen6d_predictions[model_idx]["pose"],
                 K_matrix=K,
                 target_min_pt=min_pts[obj_name],

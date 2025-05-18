@@ -3,19 +3,18 @@ from skimage.io import imread, imsave
 from ultralytics import YOLO
 import numpy as np
 import cv2
-from utils.other_utils import find_center
 import env
 
 
 def predict(
     input_image_path: Path,
     output_image_path: Path,
-) -> tuple[np.ndarray | None, float | None]:
+) -> tuple[np.ndarray | None, np.ndarray | None]:
     model = YOLO(env.ruler_model_path)
     results = model(input_image_path, verbose=False)
 
-    best_ruler_center = None
-    best_ruler_width = None
+    best_ruler_endpoint1 = None
+    best_ruler_endpoint2 = None
     highest_confidence = -1.0
     img = None
 
@@ -39,15 +38,32 @@ def predict(
                 if label == "ruler":
                     if confidence > highest_confidence:
                         highest_confidence = confidence
-                        points = np.int32([mask_points])
-                        current_center = find_center(points)
-                        min_x = np.min(points[:, :, 0])
-                        max_x = np.max(points[:, :, 0])
-                        current_width = max_x - min_x
+                        contour_points = np.array(mask_points, dtype=np.float32)
 
-                        best_ruler_center = current_center
-                        best_ruler_width = float(current_width)
-                        cv2.circle(img, best_ruler_center, 5, (0, 255, 0), -1)
+                        # Fit a rotated rectangle
+                        rect = cv2.minAreaRect(contour_points)
+                        box_cv_pts = cv2.boxPoints(
+                            rect
+                        )  # These are 4 float32 corner points
+
+                        # The sides of the rectangle
+                        # side lengths: d(v0,v1), d(v1,v2)
+                        # v0, v1, v2, v3 are the corners from box_cv_pts
+                        side01_len_sq = np.sum((box_cv_pts[0] - box_cv_pts[1]) ** 2)
+                        side12_len_sq = np.sum((box_cv_pts[1] - box_cv_pts[2]) ** 2)
+
+                        if side01_len_sq < side12_len_sq:
+                            # side01 and side23 are shorter (these are the ends of the ruler)
+                            # endpoints are midpoints of these shorter sides
+                            current_endpoint1 = (box_cv_pts[0] + box_cv_pts[1]) / 2.0
+                            current_endpoint2 = (box_cv_pts[2] + box_cv_pts[3]) / 2.0
+                        else:
+                            # side12 and side30 are shorter
+                            current_endpoint1 = (box_cv_pts[1] + box_cv_pts[2]) / 2.0
+                            current_endpoint2 = (box_cv_pts[3] + box_cv_pts[0]) / 2.0
+
+                        best_ruler_endpoint1 = current_endpoint1
+                        best_ruler_endpoint2 = current_endpoint2
         else:
             print(f"WARN! No masks or boxes found in results for: {input_image_path}")
 
@@ -55,6 +71,12 @@ def predict(
         print(f"WARN! No ruler found in picture: {input_image_path}")
 
     if img is not None:
+        if best_ruler_endpoint1 is not None and best_ruler_endpoint2 is not None:
+            # Draw the line representing the ruler
+            pt1_draw = tuple(best_ruler_endpoint1.astype(int))
+            pt2_draw = tuple(best_ruler_endpoint2.astype(int))
+            cv2.line(img, pt1_draw, pt2_draw, (0, 255, 0), 2)
+
         print(f"Saving ruler annotation output to: {output_image_path}")
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         imsave(output_image_path, img)
@@ -64,4 +86,4 @@ def predict(
         )
         return None, None
 
-    return best_ruler_center, best_ruler_width
+    return best_ruler_endpoint1, best_ruler_endpoint2

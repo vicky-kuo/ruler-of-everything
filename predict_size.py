@@ -35,22 +35,28 @@ def predict(
     K_matrix: np.ndarray,
     min_pt: np.ndarray,
     max_pt: np.ndarray,
-    ruler_center_2d: np.ndarray,
-    ruler_pixel_length: float,
+    ruler_pt1_2d: np.ndarray,
+    ruler_pt2_2d: np.ndarray,
     ruler_real_length_cm: float,
     obj_name: str,
 ):
     print(
-        f"Using pre-computed ruler info: center={ruler_center_2d}, px_length={ruler_pixel_length:.2f}"
+        f"Using pre-computed ruler info: endpoint1={ruler_pt1_2d}, endpoint2={ruler_pt2_2d}"
     )
 
-    if ruler_pixel_length <= 0:
-        print("Error: Ruler prediction has non-positive pixel length.")
-
-    half_length_vec = np.array([ruler_pixel_length / 2.0, 0.0])
-    ruler_pt1_2d = ruler_center_2d - half_length_vec
-    ruler_pt2_2d = ruler_center_2d + half_length_vec
-    print(f"Estimated horizontal ruler endpoints (2D): {ruler_pt1_2d}, {ruler_pt2_2d}")
+    # Calculate ruler_pixel_length from the two endpoints
+    ruler_pixel_length = np.linalg.norm(ruler_pt1_2d - ruler_pt2_2d)
+    if ruler_pixel_length <= 1e-6:  # Use a small epsilon for floating point comparison
+        print(
+            "Error: Ruler endpoints are too close or identical, resulting in zero pixel length."
+        )
+        return {
+            "name": obj_name,
+            "width": None,
+            "height": None,
+            "depth": None,
+        }
+    print(f"Calculated ruler pixel length: {ruler_pixel_length:.2f}")
 
     obj_center_local = (min_pt + max_pt) / 2.0
     plane_point_cam = pose_apply(pose, obj_center_local)
