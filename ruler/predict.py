@@ -5,6 +5,8 @@ import numpy as np
 import cv2
 import env
 
+logger = env.logger
+
 
 def predict(
     input_image_path: Path,
@@ -19,10 +21,10 @@ def predict(
     img = None
 
     if not results:
-        print(f"WARN! YOLO model returned no results for: {input_image_path}")
+        logger.warning(f"YOLO model returned no results for: {input_image_path}")
         img = imread(input_image_path)
         imsave(output_image_path, img)
-        print(
+        logger.info(
             f"Saved original image to {output_image_path} as no YOLO results were found."
         )
         return None, None
@@ -65,10 +67,12 @@ def predict(
                         best_ruler_endpoint1 = current_endpoint1
                         best_ruler_endpoint2 = current_endpoint2
         else:
-            print(f"WARN! No masks or boxes found in results for: {input_image_path}")
+            logger.warning(
+                f"No masks or boxes found in results for: {input_image_path}"
+            )
 
     if highest_confidence == -1.0:
-        print(f"WARN! No ruler found in picture: {input_image_path}")
+        logger.warning(f"No ruler found in picture: {input_image_path}")
 
     if img is not None:
         if best_ruler_endpoint1 is not None and best_ruler_endpoint2 is not None:
@@ -77,12 +81,12 @@ def predict(
             pt2_draw = tuple(best_ruler_endpoint2.astype(int))
             cv2.line(img, pt1_draw, pt2_draw, (0, 255, 0), 2)
 
-        print(f"Saving ruler annotation output to: {output_image_path}")
+        logger.debug(f"Saving ruler annotation output to: {output_image_path}")
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         imsave(output_image_path, img)
     else:
-        print(
-            f"Error: Image data for annotation was not available for {input_image_path}. Cannot save."
+        logger.error(
+            f"Image data for annotation was not available for {input_image_path}. Cannot save."
         )
         return None, None
 

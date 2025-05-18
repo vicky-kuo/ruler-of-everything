@@ -7,6 +7,9 @@ import os
 import transforms3d
 import math
 from utils.pose_utils import pose_apply
+import env
+
+logger = env.logger
 
 
 def caculate_axis(min_pt: np.ndarray, max_pt: np.ndarray):
@@ -49,16 +52,18 @@ def render(
 
     model_mesh: pv.DataSet = pv.read(model_args.obj_path)
     if model_mesh.n_points == 0 or model_mesh.n_cells == 0:
+        # Use logger.error for critical issues that might lead to exceptions
+        logger.error(f"Mesh is empty or invalid: {model_args.obj_path}")
         raise ValueError("Mesh is empty or invalid.")
     model_vertices_original = model_mesh.points.copy()
     model_faces = model_mesh.faces.copy()
-    print(
+    logger.debug(
         f"Loaded model '{model_args.obj_path}' with {len(model_vertices_original)} vertices and {len(model_faces)} faces"
     )
 
     # Calculate Target Object Dimensions and Axis
     target_dims, target_longest_dim, _ = caculate_axis(target_min_pt, target_max_pt)
-    print(
+    logger.debug(
         f"Target object dimensions: {target_dims}, longest dimension: {target_longest_dim}"
     )
 
@@ -66,16 +71,22 @@ def render(
     model_min_pt = np.min(model_vertices_original, axis=0)
     model_max_pt = np.max(model_vertices_original, axis=0)
     model_dims, model_longest_dim, _ = caculate_axis(model_min_pt, model_max_pt)
-    print(f"Model dimensions: {model_dims}, longest dimension: {model_longest_dim}")
+    logger.debug(
+        f"Model dimensions: {model_dims}, longest dimension: {model_longest_dim}"
+    )
 
     # Calculate Alignment Rotation
-    R_align = transforms3d.axangles.axangle2mat(
-        model_args.rotate_axis, model_args.rotation
-    )
+    R_align = np.eye(3)
+    if hasattr(model_args, "rotations") and model_args.rotations:
+        for rot_spec in model_args.rotations:
+            angle = rot_spec[0]
+            axis = rot_spec[1]
+            R_step = transforms3d.axangles.axangle2mat(axis=axis, angle=angle)
+            R_align = R_step @ R_align
 
     # Calculate Scaling Factor
     scale = target_longest_dim / model_longest_dim
-    print(f"Calculated scale factor: {scale}")
+    logger.debug(f"Calculated scale factor: {scale}")
 
     model_center_original = (model_min_pt + model_max_pt) / 2
     center_target_local = (target_min_pt + target_max_pt) / 2
@@ -108,7 +119,7 @@ def render(
                         texture_file = os.path.join(mtl_base_dir, texture_file)
                     texture_paths.append(texture_file)
     else:
-        print(f"Warning: MTL file not found at {model_args.mtl_path}")
+        logger.warning(f"MTL file not found at {model_args.mtl_path}")
 
     if (
         "MaterialIds" not in model_mesh.cell_data
@@ -127,12 +138,12 @@ def render(
 
         for current_material_id in unique_material_ids:
             mesh_part = model_mesh.extract_cells(material_ids == current_material_id)
-            print(
+            logger.debug(
                 f"Processing mesh part for Material ID: {current_material_id} with {mesh_part.n_points} points and {mesh_part.n_cells} cells"
             )
             if mesh_part.n_points == 0 or mesh_part.n_cells == 0:
-                print(
-                    f"  Skipping empty mesh part for Material ID: {current_material_id}"
+                logger.debug(
+                    f"Skipping empty mesh part for Material ID: {current_material_id}"
                 )
                 continue
 
@@ -142,28 +153,33 @@ def render(
 
             if current_material_id < len(texture_paths):
                 texture_file_path = texture_paths[current_material_id]
-                print(
-                    f"  Attempting to load texture: {texture_file_path} for material index {current_material_id}"
+                logger.debug(
+                    f"Attempting to load texture: {texture_file_path} for material index {current_material_id}"
                 )
-                mesh_part_texture = pv.read_texture(texture_file_path)
+                try:
+                    mesh_part_texture = pv.read_texture(texture_file_path)
+                except Exception as e:
+                    logger.error(f"  Failed to load texture {texture_file_path}: {e}")
+                    mesh_part_texture = None  # Ensure it's None if loading fails
             else:
-                print(
-                    f"  Warning: Material index {current_material_id} is out of bounds for texture_paths (len: {len(texture_paths)}) or no textures defined."
+                logger.warning(
+                    f"Material index {current_material_id} is out of bounds for texture_paths (len: {len(texture_paths)}) or no textures defined."
                 )
-                # mesh_part_texture = pv.read_texture(texture_paths[0])
             plotter.add_mesh(
                 mesh_part,
                 smooth_shading=True,
                 texture=mesh_part_texture,
             )
             if not mesh_part_texture:
-                print(
+                logger.debug(
                     f"  Added mesh part for material index {current_material_id} without texture."
                 )
 
     fy = K_matrix[1, 1]
     if fy <= 0:
-        print("Error: Invalid focal length fy in K_target. Using a default.")
+        logger.error(
+            "Error: Invalid focal length fy in K_matrix. Using a default value of 50."
+        )
         fov_y = 50
     else:
         fov_y = 2 * math.atan(h / (2 * fy)) * 180 / math.pi
@@ -179,13 +195,13 @@ def render(
     plotter.camera.view_angle = fov_y
     plotter.camera.window_center = (window_center_x, window_center_y)
 
-    print(
+    logger.debug(
         f"Configured PyVista camera: FoV={fov_y:.2f}, WindowCenter=({window_center_x:.3f}, {window_center_y:.3f})"
     )
 
     img = plotter.screenshot(transparent_background=False)
     imsave(output_image_path, img)
-    print(f"Saved AR output image to: {output_image_path}")
+    logger.info(f"Saved AR output image to: {output_image_path}")
 
     plotter.close()
 

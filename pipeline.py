@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 from skimage.io import imread
 import numpy as np
+import tqdm
 
 from prepare import video2image
 from ruler.predict import predict as ruler_predict
@@ -19,6 +20,7 @@ from utils.base_utils import load_cfg
 from utils.draw_utils import pts_range_to_bbox_pts
 import re
 
+logger = env.logger
 
 obj_args_list = [env.girl_args, env.big_minion_args]
 model_args = [env.soda_can_model, env.soda_bottle_model]
@@ -40,7 +42,7 @@ def main():
     raw_frames_path.mkdir(parents=True, exist_ok=True)
     ruler_frames_path.mkdir(parents=True, exist_ok=True)
     size_frames_path.mkdir(parents=True, exist_ok=True)
-    print(f"Converting video to frames in {raw_frames_path}...")
+    logger.info(f"Converting video to frames in {raw_frames_path}...")
     frame_num = video2image(
         input_video_path, raw_frames_path, interval=interval, image_size=640
     )
@@ -51,10 +53,10 @@ def main():
     )
 
     if not frame_files:
-        print(f"No frames extracted from {input_video_path}. Exiting.")
+        logger.warning(f"No frames extracted from {input_video_path}. Exiting.")
         return
 
-    print(f"Found {frame_num} frames to process.")
+    logger.info(f"Found {frame_num} frames to process.")
 
     # --- 2. Initialize Gen6D estimators ---
     estimators = {}
@@ -76,7 +78,7 @@ def main():
         gen6d_frames_path.mkdir(parents=True, exist_ok=True)
         ar_frames_path.mkdir(parents=True, exist_ok=True)
 
-        print(f"Initializing estimator for {obj_name}...")
+        logger.info(f"Initializing estimator for {obj_name}...")
         cfg = load_cfg(obj_args.cfg)
 
         database = parse_database_name(obj_args.database)
@@ -99,14 +101,14 @@ def main():
     K = np.asarray([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1]], np.float32)
 
     # --- 3 & 4. Process each frame ---
-    for frame_path in frame_files:
+    for frame_path in tqdm.tqdm(frame_files):
         current_raw_frame_path = frame_path
         frame_name = frame_path.stem
-        print("-" * 20 + frame_name + "-" * 20)
+        logger.debug("-" * 20 + frame_name + "-" * 20)
 
         # --- 3a. Ruler Prediction ---
         ruler_annotated_image_path = ruler_frames_path / f"{frame_name}_ruler.jpg"
-        print(f"Ruler predict on {current_raw_frame_path}")
+        logger.debug(f"Ruler predict on {current_raw_frame_path}")
 
         # MODIFIED: ruler_predict now returns two endpoints
         ruler_endpoint1, ruler_endpoint2 = ruler_predict(
@@ -121,9 +123,11 @@ def main():
         for obj_args in obj_args_list:
             obj_name = obj_args.name
 
-            print("-" * 20 + f"{obj_name}" + "-" * 20)
+            logger.debug("-" * 20 + f"{obj_name}" + "-" * 20)
             # --- 4a. Gen6D Prediction (predict_frame.py) ---
-            print(f"  Gen6D predict for {obj_name} on {current_raw_frame_path.name}")
+            logger.debug(
+                f"  Gen6D predict for {obj_name} on {current_raw_frame_path.name}"
+            )
             try:
                 gen6d_prediction = gen6d_predict(
                     input_image_path=current_raw_frame_path,
@@ -139,7 +143,7 @@ def main():
                 gen6d_predictions.append(gen6d_prediction)
 
             except Exception as e:
-                print(f"  Error in Gen6D prediction for {obj_name}: {e}")
+                logger.error(f"  Error in Gen6D prediction for {obj_name}: {e}")
                 continue
 
             # MODIFIED: Pass endpoints to size_predict
@@ -156,7 +160,7 @@ def main():
                 )
                 size_predictions.append(size_prediction)
             else:
-                print(
+                logger.warning(
                     f"  Skipping size prediction for {obj_name} due to missing ruler information."
                 )
                 # Append a placeholder or handle missing size prediction as needed
@@ -195,7 +199,7 @@ def main():
                     ar_models[model_idx] = model
                     break
 
-            print(
+            logger.debug(
                 f"AR render (using model {ar_models[model_idx].name}) on {current_image_path}"
             )
             ar_render(
@@ -210,7 +214,9 @@ def main():
             current_image_path = ar_annotated_image_path
             gen6d_frames_path = obj_output_base_path / "gen6d"
             gen6d_annotated_image_path = gen6d_frames_path / f"{frame_name}_gen6d.jpg"
-            print(f"Saving Gen6D annotated image to {gen6d_annotated_image_path}")
+            logger.debug(
+                f"Saving Gen6D annotated image to {gen6d_annotated_image_path}"
+            )
             gen6d_draw(
                 input_image_path=current_image_path,
                 output_image_path=gen6d_annotated_image_path,
@@ -224,7 +230,7 @@ def main():
             obj_name = obj_args.name
             size_frames_path = base_output_path / "sized"
             size_annotated_image_path = size_frames_path / f"{frame_name}_sized.jpg"
-            print(f"Saving size annotated image to {size_annotated_image_path}")
+            logger.debug(f"Saving size annotated image to {size_annotated_image_path}")
             size_draw(
                 input_image_path=current_image_path,
                 output_image_path=size_annotated_image_path,
@@ -264,8 +270,8 @@ def main():
 
     list_file.unlink(missing_ok=True)
 
-    print("Pipeline processing complete.")
-    print(f"Outputs are in {base_output_path}")
+    logger.info("Pipeline processing complete.")
+    logger.info(f"Outputs are in {base_output_path}")
 
 
 if __name__ == "__main__":

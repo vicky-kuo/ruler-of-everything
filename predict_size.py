@@ -3,8 +3,11 @@ from skimage.io import imread, imsave
 import cv2
 import numpy as np
 import warnings
+import env
 
 from utils.pose_utils import pose_apply
+
+logger = env.logger
 
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -18,12 +21,12 @@ def get_3d_point_on_plane(point_2d, K, plane_point_cam, plane_normal_cam):
 
     denom = np.dot(plane_normal_cam, ray_dir)
     if abs(denom) < 1e-6:  # Avoid division by zero or near-zero
-        print("Warning: Ray is parallel or near-parallel to the plane.")
+        logger.warning("Ray is parallel or near-parallel to the plane.")
         return None  # Ray is parallel to the plane
 
     t = np.dot(plane_normal_cam, plane_point_cam) / denom
     if t < 0:
-        print("Warning: Plane intersection is behind the camera.")
+        logger.warning("Plane intersection is behind the camera.")
         return None  # Intersection is behind the camera
 
     point_3d_cam = t * ray_dir
@@ -40,15 +43,15 @@ def predict(
     ruler_real_length_cm: float,
     obj_name: str,
 ):
-    print(
+    logger.debug(
         f"Using pre-computed ruler info: endpoint1={ruler_pt1_2d}, endpoint2={ruler_pt2_2d}"
     )
 
     # Calculate ruler_pixel_length from the two endpoints
     ruler_pixel_length = np.linalg.norm(ruler_pt1_2d - ruler_pt2_2d)
     if ruler_pixel_length <= 1e-6:  # Use a small epsilon for floating point comparison
-        print(
-            "Error: Ruler endpoints are too close or identical, resulting in zero pixel length."
+        logger.error(
+            "Ruler endpoints are too close or identical, resulting in zero pixel length."
         )
         return {
             "name": obj_name,
@@ -56,13 +59,13 @@ def predict(
             "height": None,
             "depth": None,
         }
-    print(f"Calculated ruler pixel length: {ruler_pixel_length:.2f}")
+    logger.debug(f"Calculated ruler pixel length: {ruler_pixel_length:.2f}")
 
     obj_center_local = (min_pt + max_pt) / 2.0
     plane_point_cam = pose_apply(pose, obj_center_local)
     plane_normal_cam = pose[:3, 2]
 
-    print("Calculating 3D ruler points...")
+    logger.debug("Calculating 3D ruler points...")
     ruler_pt1_3d_cam = get_3d_point_on_plane(
         ruler_pt1_2d, K_matrix, plane_point_cam, plane_normal_cam
     )
@@ -71,7 +74,7 @@ def predict(
     )
 
     if ruler_pt1_3d_cam is None or ruler_pt2_3d_cam is None:
-        print("Error: Could not determine 3D ruler points on the object plane.")
+        logger.error("Could not determine 3D ruler points on the object plane.")
         return {
             "name": obj_name,
             "width": None,
@@ -79,15 +82,17 @@ def predict(
             "depth": None,
         }
 
-    print(
+    logger.debug(
         f"Estimated Ruler 3D points (camera coords): {ruler_pt1_3d_cam}, {ruler_pt2_3d_cam}"
     )
 
     ruler_dist_3d_cam = np.linalg.norm(ruler_pt1_3d_cam - ruler_pt2_3d_cam)
-    print(f"Calculated 3D distance for ruler (camera units): {ruler_dist_3d_cam}")
+    logger.debug(
+        f"Calculated 3D distance for ruler (camera units): {ruler_dist_3d_cam}"
+    )
 
     if ruler_dist_3d_cam < 1e-6:
-        print("Error: Calculated 3D ruler distance is zero or near-zero.")
+        logger.error("Calculated 3D ruler distance is zero or near-zero.")
         return {
             "name": obj_name,
             "width": None,
@@ -96,7 +101,7 @@ def predict(
         }
 
     units_per_cm = ruler_dist_3d_cam / ruler_real_length_cm
-    print(f"Scale factor: {units_per_cm:.4f} camera units per cm")
+    logger.debug(f"Scale factor: {units_per_cm:.4f} camera units per cm")
 
     width_units = max_pt[0] - min_pt[0]
     height_units = max_pt[1] - min_pt[1]

@@ -1,5 +1,9 @@
 import os
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.ERROR, format="[%(levelname)-7s] %(message)s")
+logger = logging.getLogger(__name__)
 
 # ruler env
 task = "segment"
@@ -66,7 +70,7 @@ minion_args = ObjectArgs(
 )
 
 big_minion_args = ObjectArgs(
-    name="minion",
+    name="big_minion",
     cfg="configs/gen6d_pretrain.yaml",
     database="custom/big_minion",
     input_file="big_minion_1.jpg",
@@ -79,17 +83,17 @@ class Model:
         self,
         name: str,
         range_cm: tuple[float, float],
-        rotation: float = 0.0,
-        rotate_axis: list = [np.zeros(3, dtype=float)],
+        rotations: list[tuple[float, list[float]]],
     ):
         self.name = name
         self.input_path = os.path.join(input_path, name)
         self.obj_path = os.path.join(self.input_path, name + ".obj")
         self.mtl_path = os.path.join(self.input_path, name + ".mtl")
         self.range_cm = range_cm
-        self.rotation = rotation
-        self.rotate_axis = rotate_axis
+        self.rotations = rotations
 
 
-soda_can_model = Model("soda_can", (0, 15), np.pi / 2, [1, 0, 0])
-soda_bottle_model = Model("bottle", (15, 999), np.pi / 2, [1, 0, 0])
+soda_can_model = Model("soda_can", (0, 15), [(np.pi / 2, [1, 0, 0])])
+soda_bottle_model = Model(
+    "bottle", (15, 999), [(np.pi / 2, [1, 0, 0]), (-np.pi / 8, [0, 0, 1])]
+)
